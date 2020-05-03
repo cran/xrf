@@ -1,10 +1,20 @@
-# eXtreme RuleFit
+# xrf
 
-[![Travis build status](https://travis-ci.org/holub008/xrf.svg?branch=master)](https://travis-ci.org/holub008/xrf)
+[![R build status](https://github.com/holub008/xrf/workflows/R-CMD-check/badge.svg)](https://github.com/holub008/xrf/actions)
+[![Codecov test coverage](https://codecov.io/gh/holub008/xrf/branch/master/graph/badge.svg)](https://codecov.io/gh/holub008/xrf?branch=master)
+[![xrf on CRAN](https://cranlogs.r-pkg.org/badges/xrf)](https://CRAN.R-project.org/package=xrf)
 
 ## Install
+For current CRAN release:
+
 ```R
-devtools::install_git('https://github.com/holub008/xrf')
+install.packages('xrf')
+```
+
+For the current development version:
+
+```R
+devtools::install_dev('xrf')
 ```
 
 ## About
@@ -28,15 +38,15 @@ The general algorithm follows:
     * For an illustration of de-overlapping xrf models, see the "De-overlapping rules" section below
     * For a description of this algorithm, see [this document](https://github.com/holub008/snippets/blob/master/overlapped_hyperrectangles/overlapped_hyperrectangles.pdf)
 
-### Comparison to existing packages
-[pre](https://CRAN.R-project.org/package=pre) is a package on CRAN for fitting prediction rule ensembles, and [rulefit](https://github.com/Zelazny7/rulefit) is another alternative on hosted on github. xrf improves on some aspects of these by:
+### Comparison to alternatives
+Several implementations of RuleFit are available for R: [pre](https://CRAN.R-project.org/package=pre), [horserule](https://CRAN.R-project.org/package=horserule), and [rulefit](https://github.com/Zelazny7/rulefit). xrf improves on some aspects of these by:
 * Usually building more accurate models at fixed number of parameters
 * Usually building models faster
-* Building models that predict from missing data and new factor-levels
+* Building models that predict for new factor-levels
 * Providing a more concise and limited interface
-* Tested & actively maintained, fewer bugs
+* Tested & actively maintained for fewer bugs
 
-On the last point, as of April 2019, both packages fail to even build a model on the census income example below due to bugs.
+On the last point, as of April 2019, the 'pre' and 'rulefit' packages fail to build a model on the census income example below due to bugs.
 
 ## Example
 
@@ -63,6 +73,7 @@ Here we employ out-of-the-box RuleFit from pre & xrf, as well as raw xgboost & g
 library(dplyr)
 library(pre)
 library(rulefit) # installed via devtools::install_git("https://github.com/Zelazny7/rulefit")
+library(horserule)
 library(glmnet)
 library(xgboost)
 
@@ -93,9 +104,13 @@ system.time(m_pre <- pre(above_50k ~ ., na.omit(census_train),
                          family = 'binomial', ntrees = 100, maxdepth = 3, tree.unbiased = TRUE))
 # note, as of 2019-04-25, this example fails by attempting to access names() of a sparse matrix (seems it should be using colnames())
 system.time({
-  m_gbm <- gbm.fit(census_train_mat, census_train$above_50k, distribution="bernoulli", interaction.depth=3, shrinkage=0.1, verbose = FALSE)
-  rf_plan <- rulefit(m_gbm, n.trees=10)
-  m_rf <- train(rf_plan, census_train_mat, y = census_train$above_50k, family="binomial")
+  m_gbm <- gbm.fit(census_train_mat, census_train$above_50k, distribution="bernoulli", interaction.depth = 3, shrinkage = 0.1, verbose = FALSE)
+  rf_plan <- rulefit(m_gbm, n.trees = 100)
+  m_rf <- train(rf_plan, census_train_mat, y = census_train$above_50k, family = "binomial")
+})
+# note that this involves no hyperparameter tuning
+system.time({
+  m_hrf <- HorseRuleFit(census_train_mat, census_train$above_50k, ntree=100, L=3)
 })
 system.time(m_xrf <- xrf(above_50k ~ ., census_train, family = 'binomial', 
              xgb_control = list(nrounds = 100, max_depth = 3)))
@@ -103,6 +118,7 @@ m_xgb <- xgboost(census_train_mat, census_train$above_50k, max_depth = 3, nround
 m_glm <- cv.glmnet(census_train_mat, census_train$above_50k, alpha = 1)
 
 auc(predict(m_pre, census_test), census_test$above_50k)
+auc(predict(m_hrf, census_test_mat), census_test$above_50k)
 auc(predict(m_xrf, census_test), census_test$above_50k)
 auc(predict(m_glm, newx = census_test_mat, s = 'lambda.min'), census_test$above_50k)
 auc(predict(m_xgb, newdata = census_test_mat, s = 'lambda.min'), census_test$above_50k)
@@ -110,19 +126,23 @@ auc(predict(m_xgb, newdata = census_test_mat, s = 'lambda.min'), census_test$abo
 
 With results (on a 2018 Macbook Pro, 16Gb Memory, 6 core i7, mojave):
 
-| Model | Time (s) |
-| ----- | -------- |
-| xrf   | 73       |    
-| pre   | 211*     |
+| Model       | Time (s) |
+| ----------- | -------- |
+| xrf         | 73       |    
+| pre         | 211*     |
+| horserule   | 29       |
 
 On the test set:
 
-| Model    |  AUC     |
-| -------- | -------- |
-| xrf      | .924     |      
-| pre      | .906*    |
-| xgboost  | .926     | 
-| glmnet   | .892     |
+| Model     |  AUC     |
+| --------- | -------- |
+| xrf       | .924     |      
+| pre       | .906*    |
+| horserule | .892     |
+| xgboost   | .926     | 
+| glmnet    | .892     |
+
+xrf has the highest accuracy among RuleFit models, nearly comparable to the tree ensemble. horserule delivered a model much faster, but its accuracy was no better than the LASSO fit. This is likely due to aggressive rule regularization, which may be tuned by altering the out of the box hyperparameters.
 
 ## De-overlapping rules
 Overlapped rules occur when two or more rules belonging to the same subspace are not in mutual exclusion; de-overlapping guarantees that all rules belonging to the same subspace are in mutual exclusion. For example, the rules:
@@ -212,3 +232,4 @@ How slick is that! We have:
 Effects are immediately available by doing a lookup in the exclusive rules. This is a great win for interpretability.
 
 As mentioned above, this example is contrived in that it uses `depth=1` trees (i.e. conjunctions of size 1). As depth increases, interpretability can suffer regardless de-overlapping if the final ruleset is non-sparse. However, for certain problems, particularly small depth or sparse effects, de-overlapping can be a boon for interpretability.
+
