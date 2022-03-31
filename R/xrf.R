@@ -86,7 +86,7 @@ xrf_preconditions <- function(family, xgb_control, glm_control,
 ## this may be exposed to the user in the future
 get_xgboost_objective <- function(family) {
   if (family == 'gaussian') {
-    return('reg:linear')
+    return('reg:squarederror')
   }
   else if (family == 'binomial') {
     return('binary:logistic')
@@ -328,7 +328,7 @@ dedupe_train_rules <- function(evaluated_rules) {
 #'
 #' @examples
 #' m <- xrf(Petal.Length ~ ., iris,
-#'          xgb_control = list(nrounds = 20, max_depth = 2),
+#'          xgb_control = list(nrounds = 2, max_depth = 2),
 #'          family = 'gaussian')
 #'
 #' @export
@@ -372,7 +372,7 @@ xrf <- function(object, ...) {
 #'
 #' @examples
 #' m <- xrf(Petal.Length ~ ., iris,
-#'          xgb_control = list(nrounds = 20, max_depth = 2),
+#'          xgb_control = list(nrounds = 2, max_depth = 2),
 #'          family = 'gaussian')
 #'
 #' @export
@@ -395,13 +395,17 @@ xrf.formula <- function(object, data, family,
   model_matrix_method <- if (sparse) sparse.model.matrix else model.matrix
   design_matrix <- model_matrix_method(expanded_formula, data)
 
+  nrounds <- xgb_control$nrounds
+  # necessary to remove from params to avoid false positive warnings
+  xgb_control <- within(xgb_control, rm(nrounds))
+
   if (is.null(prefit_xgb)) {
     m_xgb <- xgboost(data = design_matrix,
-                     label = data[[response_var]],
-                     nrounds = xgb_control$nrounds,
-                     objective = get_xgboost_objective(family),
-                     params = xgb_control,
-                     verbose = 0)
+                   label = data[[response_var]],
+                   nrounds = nrounds,
+                   objective = get_xgboost_objective(family),
+                   params = xgb_control,
+                   verbose = 0)
     rules <- extract_xgb_rules(m_xgb)
   }
   else {
@@ -478,7 +482,7 @@ xrf.formula <- function(object, data, family,
 #'
 #' @examples
 #' m <- xrf(Petal.Length ~ ., iris,
-#'          xgb_control = list(nrounds = 20, max_depth = 2),
+#'          xgb_control = list(nrounds = 2, max_depth = 2),
 #'          family = 'gaussian')
 #' design <- model.matrix(m, iris, sparse = FALSE)
 #'
@@ -512,7 +516,7 @@ model.matrix.xrf <- function(object, data, sparse = TRUE, ...) {
 #'
 #' @examples
 #' m <- xrf(Petal.Length ~ ., iris,
-#'          xgb_control = list(nrounds = 20, max_depth = 2),
+#'          xgb_control = list(nrounds = 2, max_depth = 2),
 #'          family = 'gaussian')
 #' predictions <- predict(m, iris)
 #'
@@ -551,7 +555,7 @@ synthesize_conjunctions <- function(rules) {
 #'
 #' @examples
 #' m <- xrf(Petal.Length ~ ., iris,
-#'          xgb_control = list(nrounds = 20, max_depth = 2),
+#'          xgb_control = list(nrounds = 2, max_depth = 2),
 #'          family = 'gaussian')
 #' linear_model_coefficients <- coef(m, lambda = 'lambda.1se')
 #'
@@ -582,7 +586,7 @@ coef.xrf <- function(object, lambda = 'lambda.min', ...) {
 #'
 #' @examples
 #' m <- xrf(Petal.Length ~ ., iris,
-#'          xgb_control = list(nrounds = 20, max_depth = 2),
+#'          xgb_control = list(nrounds = 2, max_depth = 2),
 #'          family = 'gaussian')
 #' summary(m)
 #'
@@ -604,7 +608,7 @@ summary.xrf <- function(object, ...) {
 #'
 #' @examples
 #' m <- xrf(Petal.Length ~ ., iris,
-#'          xgb_control = list(nrounds = 20, max_depth = 2),
+#'          xgb_control = list(nrounds = 2, max_depth = 2),
 #'          family = 'gaussian')
 #' print(m)
 #'
