@@ -1,10 +1,10 @@
-482ffeae2247ae97ff5d1ab1bee22f32 *DESCRIPTION
+b660212d622167ca84cc2b08d0f7c313 *DESCRIPTION
 16443aefd49b59258f9dc8e0aedafe2d *LICENSE
 a97b652be327b6f55737e394aa76955d *NAMESPACE
 d36da6cc83d616f4c607e5e97edc2e32 *R/glmnot.R
 7ed4a7e34782b4f19a74c9e605b6c9ae *R/hyperrectangle_overlap.R
 5de883b3162e9ce600c4feb61b19eae6 *R/utils.R
-b124af6419ef1c81806d0683137534a9 *R/xrf.R
+33f1df7a6273cc9b7f7cf01ceabed841 *R/xrf.R
 9919254d11e3151fcdf49060d99ce725 *README.md
 dcc69d1be5691ca575b5ddc6fafadc0a *man/coef.xrf.Rd
 653aad59a9c44f5096f7eb13dd73b592 *man/model.matrix.xrf.Rd
